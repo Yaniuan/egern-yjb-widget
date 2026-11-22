@@ -414,6 +414,198 @@ async function testSlowQuoteCompletesBeforeFetchDeadline() {
   assert(values.some((value) => value.includes('当日涨幅金额 +6.00')));
 }
 
+function assertValidDsl(node, nodePath = 'widget') {
+  assert(node && typeof node === 'object', `${nodePath}: node must be object`);
+  assert(['widget', 'stack', 'text', 'image', 'spacer', 'date'].includes(node.type), `${nodePath}: invalid type ${node.type}`);
+  if (node.opacity !== undefined) {
+    assert(['text', 'image', 'date'].includes(node.type), `${nodePath}: opacity not allowed on ${node.type}`);
+  }
+  if (node.borderRadius !== undefined || node.borderWidth !== undefined || node.borderColor !== undefined) {
+    assert(['stack', 'image'].includes(node.type), `${nodePath}: border properties not allowed on ${node.type}`);
+  }
+  if (node.width !== undefined || node.height !== undefined) {
+    assert(['stack', 'image'].includes(node.type), `${nodePath}: width/height not allowed on ${node.type}`);
+  }
+  if (node.backgroundGradient) {
+    assert(Array.isArray(node.backgroundGradient.colors) && node.backgroundGradient.colors.length > 0, `${nodePath}: gradient requires colors`);
+    if (node.backgroundGradient.stops) {
+      assert.equal(node.backgroundGradient.stops.length, node.backgroundGradient.colors.length, `${nodePath}: stops length mismatch`);
+    }
+  }
+  if (node.type === 'text') {
+    assert.equal(typeof node.text, 'string', `${nodePath}: text must be string`);
+    if (node.maxLines !== undefined) assert(Number.isInteger(node.maxLines) && node.maxLines >= 1, `${nodePath}: invalid maxLines`);
+    if (node.minScale !== undefined) assert(node.minScale > 0 && node.minScale <= 1, `${nodePath}: invalid minScale`);
+  }
+  if (node.type === 'image') {
+    assert(typeof node.src === 'string' && (node.src.startsWith('sf-symbol:') || node.src.startsWith('data:')), `${nodePath}: invalid image src`);
+  }
+  if (node.type === 'stack') {
+    assert(Array.isArray(node.children), `${nodePath}: stack.children must be array`);
+  }
+  if (Array.isArray(node.children)) {
+    node.children.forEach((child, index) => assertValidDsl(child, `${nodePath}.children[${index}]`));
+  }
+}
+
+async function testDslValidityAcrossAllFamilies() {
+  for (const family of ['systemSmall', 'systemMedium', 'systemLarge', 'systemExtraLarge', 'accessoryRectangular', 'accessoryCircular', 'accessoryInline']) {
+    const tree = await widget(liveContext(family));
+    assertValidDsl(tree, family);
+  }
+}
+
+async function testSummaryVisibilityByFamily() {
+  for (const family of ['systemMedium', 'systemLarge', 'systemExtraLarge']) {
+    const values = textNodes(await widget(liveContext(family))).map((node) => node.text);
+    assert(values.includes('当日涨幅金额'), `${family} should show summary label`);
+    assert(values.includes('+4.00'), `${family} should show aggregated summary amount`);
+  }
+  for (const family of ['systemSmall', 'accessoryRectangular', 'accessoryCircular', 'accessoryInline']) {
+    const values = textNodes(await widget(liveContext(family))).map((node) => node.text);
+    assert(!values.includes('+4.00'), `${family} should omit header summary amount`);
+  }
+}
+
+async function testEmptyAndErrorVisualStates() {
+  const families = ['systemSmall', 'systemMedium', 'systemLarge', 'accessoryRectangular'];
+  const emptyCtx = (family) => ({
+    env: { YJB_TOKEN: 'test', YJB_SIGNING_SECRET: 'test' },
+    widgetFamily: family,
+    storage: storage(),
+    http: {
+      get: async (url) => {
+        if (url.includes('/users/v1/user-account')) return response({ list: [{ id: 1 }] });
+        if (url.includes('/fund-accounts/')) return response({ list: [] });
+        throw new Error(url);
+      },
+      post: async () => response([]),
+    },
+  });
+  const missingCtx = (family) => ({
+    env: { YJB_SIGNING_SECRET: 'test' },
+    widgetFamily: family,
+    storage: storage(),
+    http: { get: async () => response({}), post: async () => response({}) },
+  });
+  const invalidCtx = (family) => ({
+    env: { YJB_TOKEN: 'expired', YJB_SIGNING_SECRET: 'test' },
+    widgetFamily: family,
+    storage: storage(),
+    http: {
+      get: async () => ({ status: 401, json: async () => ({ code: 401, message: 'unauthorized' }) }),
+      post: async () => response({}),
+    },
+  });
+  const networkErrorCtx = (family) => ({
+    env: { YJB_TOKEN: 'test', YJB_SIGNING_SECRET: 'test' },
+    widgetFamily: family,
+    storage: storage(),
+    http: {
+      get: async () => { throw new Error('network down'); },
+      post: async () => response({}),
+    },
+  });
+
+  for (const family of families) {
+    const emptyTree = await widget(emptyCtx(family));
+    assertValidDsl(emptyTree, `empty.${family}`);
+    assert(textNodes(emptyTree).some((node) => node.text.includes('暂无基金持仓')), `${family} missing empty state`);
+
+    const missingTree = await widget(missingCtx(family));
+    assertValidDsl(missingTree, `missing.${family}`);
+    const missingTexts = textNodes(missingTree).map((node) => node.text);
+    assert(missingTexts.some((value) => value.includes('未配置登录令牌')), `${family} missing token title`);
+    if (!family.startsWith('accessory')) {
+      assert(missingTexts.some((value) => value.includes('Token 验证失败 · 未配置')), `${family} missing token footer`);
+    }
+
+    const invalidTree = await widget(invalidCtx(family));
+    assertValidDsl(invalidTree, `invalid.${family}`);
+    const invalidTexts = textNodes(invalidTree).map((node) => node.text);
+    assert(invalidTexts.some((value) => value.includes('登录令牌已失效')), `${family} missing invalid token title`);
+    if (!family.startsWith('accessory')) {
+      assert(invalidTexts.some((value) => value.includes('Token 验证失败 · 令牌无效')), `${family} missing invalid token footer`);
+    }
+
+    const networkTree = await widget(networkErrorCtx(family));
+    assertValidDsl(networkTree, `network.${family}`);
+    assert(textNodes(networkTree).some((node) => node.text.includes('network down')), `${family} missing network error message`);
+  }
+}
+
+async function testDisabledFieldsState() {
+  for (const envExtra of [
+    { YJB_SHOW_DAILY_CHANGE_AMOUNT: '0', YJB_SHOW_DAILY_CHANGE_PCT: '0' },
+    { YJB_MAX_FIELDS: '0' },
+  ]) {
+    for (const family of ['systemSmall', 'systemMedium', 'systemLarge', 'accessoryRectangular']) {
+      const ctx = liveContext(family);
+      ctx.env = { ...ctx.env, ...envExtra };
+      const tree = await widget(ctx);
+      assertValidDsl(tree, `disabled.${family}`);
+      assert(textNodes(tree).some((node) => node.text.includes('当日涨幅字段已关闭')), `${family} missing disabled pill`);
+    }
+  }
+}
+
+async function testDenseListAndLongNames() {
+  const holdings = Array.from({ length: 10 }, (_, index) => ({
+    fund_id: 700 + index,
+    short_name: `超长名称基金管理有限公司精选混合型证券投资基金第${index + 1}期`,
+    money: 10000,
+    market_status: 'open',
+  }));
+  const makeDenseCtx = (family) => ({
+    env: { YJB_TOKEN: 'test', YJB_SIGNING_SECRET: 'test' },
+    widgetFamily: family,
+    storage: storage(),
+    http: {
+      get: async (url) => {
+        if (url.includes('/users/v1/user-account')) return response({ list: [{ id: 1 }] });
+        if (url.includes('/fund-accounts/')) return response({ list: holdings });
+        if (url.includes('/increase-rate')) {
+          const id = Number(new URL(url).searchParams.get('fund_id'));
+          const offset = id - 700;
+          return response({
+            weighted_increase_rate: Number(((5 - offset) * 0.4).toFixed(2)),
+            increase_amount: (5 - offset) * 40,
+            market_status: 'open',
+          });
+        }
+        throw new Error(url);
+      },
+      post: async () => response([]),
+    },
+  });
+
+  for (const family of ['systemMedium', 'systemLarge', 'systemExtraLarge']) {
+    const tree = await widget(makeDenseCtx(family));
+    assertValidDsl(tree, `dense.${family}`);
+    const rows = denseFundRows(tree);
+    assert(rows.length >= 4, `${family} should render dense fund rows`);
+    assert(rows[0].name.includes('第1期') && rows[1].name.includes('第2期'), `${family} should preserve descending sort order`);
+    if (family !== 'systemMedium') {
+      assert.equal(rows.length, 10, `${family} should show all 10 rows`);
+    }
+    for (const node of textNodes(tree)) {
+      if (node.text === '●') continue;
+      assert.equal(node.maxLines, 1, `${family} dense text "${node.text}" must clamp to 1 line`);
+      assert(node.minScale !== undefined && node.minScale <= 0.8, `${family} dense text "${node.text}" must allow scaling`);
+    }
+  }
+}
+
+async function testOptionalWidgetUrl() {
+  const withoutUrl = await widget(liveContext('systemMedium'));
+  assert.equal(withoutUrl.url, undefined, 'url should be omitted when YJB_WIDGET_URL is unset');
+
+  const ctxWithUrl = liveContext('systemMedium');
+  ctxWithUrl.env.YJB_WIDGET_URL = 'https://yangjibao.com';
+  const withUrl = await widget(ctxWithUrl);
+  assert.equal(withUrl.url, 'https://yangjibao.com', 'url should attach to root widget when configured');
+}
+
 await testFamilies();
 await testClosedStateAndFallbackParsing();
 await testOpenMarketGroupsRowsByDotColor();
@@ -426,4 +618,10 @@ await testTokenConfigurationStates();
 await testQuoteSourceFailureIsVisibleWithCachedValues();
 await testOverviewNestedQuoteFallback();
 await testSlowQuoteCompletesBeforeFetchDeadline();
-console.log('PASS: widget families, open-market dot grouping, token and quote-source states, slow-fetch recovery, closed-state semantics, and storage isolation');
+await testDslValidityAcrossAllFamilies();
+await testSummaryVisibilityByFamily();
+await testEmptyAndErrorVisualStates();
+await testDisabledFieldsState();
+await testDenseListAndLongNames();
+await testOptionalWidgetUrl();
+console.log('PASS: widget families, open-market dot grouping, token and quote-source states, slow-fetch recovery, closed-state semantics, storage isolation, DSL validity, visual states, dense layout, and optional URL');

@@ -19,3 +19,4 @@ widgets:
       YJB_SHOW_DAILY_CHANGE_AMOUNT: '1'
       YJB_SHOW_DAILY_CHANGE_PCT: '1'
       YJB_MAX_FIELDS: '2'
+      YJB_WIDGET_URL: ''

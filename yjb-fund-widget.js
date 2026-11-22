@@ -11,8 +11,44 @@ const HTTP_TIMEOUT_MS = 12000;
 const FETCH_DEADLINE_MS = 55000;
 const QUOTE_STALE_AFTER_SECONDS = 10 * 60;
 
-function text(value, size, weight, color, maxLines = 1, minScale = 0.7) {
-  return {
+const THEME = {
+  bgGradient: {
+    type: 'linear',
+    colors: ['#141926', '#0E131E', '#0A0D16'],
+    stops: [0, 0.55, 1],
+    startPoint: { x: 0, y: 0 },
+    endPoint: { x: 1, y: 1 },
+  },
+  primary: '#F8FAFC',
+  secondary: '#94A3B8',
+  tertiary: '#64748B',
+  positive: '#FF6B6B',
+  negative: '#3DD68C',
+  neutral: '#CBD5E1',
+  accent: '#60A5FA',
+  warning: '#FBBF24',
+  disabledText: '#7C879B',
+  cardBg: '#FFFFFF0D',
+  cardBgAlt: '#FFFFFF12',
+  cardBorder: '#FFFFFF18',
+  divider: '#FFFFFF14',
+  heroBgPositive: '#FF6B6B16',
+  heroBorderPositive: '#FF6B6B38',
+  heroBgNegative: '#3DD68C16',
+  heroBorderNegative: '#3DD68C38',
+  heroBgNeutral: '#FFFFFF0E',
+  heroBorderNeutral: '#FFFFFF1A',
+  pillPositiveBg: '#FF6B6B1E',
+  pillNegativeBg: '#3DD68C1E',
+  pillNeutralBg: '#FFFFFF12',
+  disabledBg: '#FFFFFF0A',
+  disabledBorder: '#FFFFFF16',
+  noticeBg: '#FBBF2416',
+  noticeBorder: '#FBBF2438',
+};
+
+function text(value, size, weight, color, maxLines = 1, minScale = 0.7, extra = null) {
+  const node = {
     type: 'text',
     text: String(value),
     font: { size, weight },
@@ -20,6 +56,98 @@ function text(value, size, weight, color, maxLines = 1, minScale = 0.7) {
     maxLines,
     minScale,
   };
+  if (extra && typeof extra === 'object') Object.assign(node, extra);
+  return node;
+}
+
+function symbol(name, size, color) {
+  return {
+    type: 'image',
+    src: `sf-symbol:${name}`,
+    width: size,
+    height: size,
+    color,
+  };
+}
+
+function metricTone(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'neutral';
+  const num = Number(value);
+  return num > 0 ? 'positive' : num < 0 ? 'negative' : 'neutral';
+}
+
+function pillBgFor(value) {
+  const tone = metricTone(value);
+  if (tone === 'positive') return THEME.pillPositiveBg;
+  if (tone === 'negative') return THEME.pillNegativeBg;
+  return THEME.pillNeutralBg;
+}
+
+function statusStyleFor(dataStatus) {
+  if (dataStatus === 'live') {
+    return {
+      color: '#3DD68C',
+      bg: '#3DD68C1A',
+      border: '#3DD68C40',
+      icon: 'bolt.fill',
+    };
+  }
+  if (dataStatus === 'partial') {
+    return {
+      color: '#FBBF24',
+      bg: '#FBBF241A',
+      border: '#FBBF2440',
+      icon: 'clock.fill',
+    };
+  }
+  if (dataStatus === 'delayed') {
+    return {
+      color: '#F59E0B',
+      bg: '#F59E0B1A',
+      border: '#F59E0B3D',
+      icon: 'clock.arrow.circlepath',
+    };
+  }
+  if (dataStatus === 'error' || dataStatus === 'quote-error') {
+    return {
+      color: '#FF6B6B',
+      bg: '#FF6B6B1A',
+      border: '#FF6B6B40',
+      icon: 'exclamationmark.triangle.fill',
+    };
+  }
+  if (dataStatus === 'loading') {
+    return {
+      color: '#60A5FA',
+      bg: '#60A5FA1A',
+      border: '#60A5FA40',
+      icon: 'arrow.triangle.2.circlepath',
+    };
+  }
+  if (dataStatus === 'closed') {
+    return {
+      color: '#94A3B8',
+      bg: '#FFFFFF10',
+      border: '#FFFFFF1C',
+      icon: 'moon.fill',
+    };
+  }
+  return {
+    color: '#94A3B8',
+    bg: '#FFFFFF10',
+    border: '#FFFFFF1C',
+    icon: 'tray',
+  };
+}
+
+function tokenStyleFor(tokenState) {
+  const status = tokenState && tokenState.status;
+  if (status === 'success') return { color: '#3DD68C', icon: 'checkmark.shield.fill' };
+  if (status === 'missing') return { color: '#FBBF24', icon: 'key.fill' };
+  if (status === 'invalid') return { color: '#FF6B6B', icon: 'exclamationmark.shield.fill' };
+  if (status === 'error') return { color: '#FF6B6B', icon: 'wifi.exclamationmark' };
+  if (status === 'pending') return { color: '#60A5FA', icon: 'arrow.triangle.2.circlepath' };
+  return { color: THEME.tertiary, icon: 'questionmark.circle' };
 }
 
 function formatNumber(value, suffix = '') {
@@ -561,16 +689,16 @@ function rowsByDotColorAndIncome(rows, marketStatus, liveWindow) {
     .map(({ row }) => row);
 }
 
-function fundNameNode(row, size, weight, colors, maxLines = 1, minScale = 0.7, liveWindow = true, marketStatus = '开市') {
-  const name = text(row.name, size, weight, colors.primary, maxLines, minScale);
-  name.flex = 1;
+function fundNameNode(row, size, weight, colors, maxLines = 1, minScale = 0.6, liveWindow = true, marketStatus = '开市') {
+  const name = text(row.name, size, weight, colors.primary, maxLines, minScale, { flex: 1 });
+  const dotSize = typeof size === 'number' && size <= 10 ? 8 : 9;
   return {
     type: 'stack',
     direction: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
     children: [
-      text('●', 'caption2', 'bold', statusDotColor(row, liveWindow, marketStatus), 1, 1),
+      text('●', dotSize, 'bold', statusDotColor(row, liveWindow, marketStatus), 1, 1),
       name,
     ],
   };
@@ -583,7 +711,8 @@ function aggregateDailyAmount(rows) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
 }
 
-function headerAmountNode(rows, dataStatus, colors) {
+function summaryCardNode(rows, dataStatus, family, denseLayout, colors) {
+  if (family === 'systemSmall' || family.startsWith('accessory')) return null;
   const sourceRows = dataStatus === 'partial'
     ? rows.filter((row) => row.dailyChangeIsLive === true)
     : rows;
@@ -592,8 +721,208 @@ function headerAmountNode(rows, dataStatus, colors) {
   const live = dataStatus === 'live';
   const partial = dataStatus === 'partial';
   const label = live ? '当日涨幅金额' : partial ? '实时涨幅金额' : '最后有效涨幅金额';
-  const color = live || partial ? colorFor(amount, colors) : colors.secondary;
-  return text(`${label} ${formatNumber(amount)}`, 'caption1', 'medium', color, 1, 0.45);
+  const amountColor = live || partial ? colorFor(amount, colors) : colors.secondary;
+  const tone = live || partial ? metricTone(amount) : 'neutral';
+  const backgroundColor = tone === 'positive'
+    ? THEME.heroBgPositive
+    : tone === 'negative'
+      ? THEME.heroBgNegative
+      : THEME.heroBgNeutral;
+  const borderColor = tone === 'positive'
+    ? THEME.heroBorderPositive
+    : tone === 'negative'
+      ? THEME.heroBorderNegative
+      : THEME.heroBorderNeutral;
+
+  if (family === 'systemMedium') {
+    const padding = denseLayout ? [3, 8] : [5, 10];
+    const borderRadius = denseLayout ? 8 : 10;
+    const labelSize = denseLayout ? 10 : 10.5;
+    const valueSize = denseLayout ? 12 : 14;
+    return {
+      type: 'stack',
+      direction: 'row',
+      alignItems: 'center',
+      gap: 6,
+      padding,
+      borderRadius,
+      backgroundColor,
+      borderWidth: 0.5,
+      borderColor,
+      children: [
+        text(label, labelSize, 'medium', THEME.secondary, 1, 0.7),
+        { type: 'spacer' },
+        text(formatNumber(amount), valueSize, 'bold', amountColor, 1, 0.6, { textAlign: 'right' }),
+      ],
+    };
+  }
+
+  const compactHero = rows.length > 8;
+  const leftChildren = [
+    text(label, compactHero ? 10 : 10.5, 'medium', THEME.secondary, 1, 0.7),
+  ];
+  if (partial) {
+    leftChildren.push(text(`实时 ${liveRowCount(rows)}/${rows.length} 只`, 9, 'medium', THEME.warning, 1, 0.7));
+  }
+  return {
+    type: 'stack',
+    direction: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: compactHero ? [5, 10] : [8, 12],
+    borderRadius: compactHero ? 9 : 11,
+    backgroundColor,
+    borderWidth: 0.5,
+    borderColor,
+    children: [
+      {
+        type: 'stack',
+        direction: 'column',
+        alignItems: 'start',
+        gap: 1,
+        flex: 1,
+        children: leftChildren,
+      },
+      text(formatNumber(amount), compactHero ? 14 : 18, 'bold', amountColor, 1, 0.55, { textAlign: 'right' }),
+    ],
+  };
+}
+
+function headerNode(statusLabel, dataStatus, family) {
+  const lockScreen = family.startsWith('accessory');
+  const compact = family === 'systemSmall' || lockScreen;
+  const style = statusStyleFor(dataStatus);
+  if (lockScreen) {
+    return {
+      type: 'stack',
+      direction: 'row',
+      alignItems: 'center',
+      gap: 4,
+      children: [
+        text('养基宝', 11, 'bold', THEME.primary, 1, 0.8),
+        { type: 'spacer' },
+        text(statusLabel, 9.5, 'semibold', style.color, 1, 0.65),
+      ],
+    };
+  }
+  const brandIcon = compact
+    ? symbol('chart.line.uptrend.xyaxis', 11, THEME.accent)
+    : {
+      type: 'stack',
+      direction: 'row',
+      alignItems: 'center',
+      width: 20,
+      height: 20,
+      borderRadius: 6,
+      backgroundColor: '#60A5FA1F',
+      borderWidth: 0.5,
+      borderColor: '#60A5FA3D',
+      padding: [4.5, 4.5],
+      children: [symbol('chart.line.uptrend.xyaxis', 11, THEME.accent)],
+    };
+  return {
+    type: 'stack',
+    direction: 'row',
+    alignItems: 'center',
+    gap: 6,
+    children: [
+      {
+        type: 'stack',
+        direction: 'row',
+        alignItems: 'center',
+        gap: compact ? 4 : 6,
+        children: [
+          brandIcon,
+          text('养基宝', compact ? 13 : 15, 'bold', THEME.primary, 1, 0.8),
+        ],
+      },
+      { type: 'spacer' },
+      {
+        type: 'stack',
+        direction: 'row',
+        alignItems: 'center',
+        gap: 3,
+        padding: compact ? [2, 6] : [3, 8],
+        borderRadius: 99,
+        backgroundColor: style.bg,
+        borderWidth: 0.5,
+        borderColor: style.border,
+        children: [
+          symbol(style.icon, compact ? 8 : 9, style.color),
+          text(statusLabel, compact ? 9 : 10, 'semibold', style.color, 1, 0.65),
+        ],
+      },
+    ],
+  };
+}
+
+function disabledFieldPill(compact) {
+  return {
+    type: 'stack',
+    direction: 'row',
+    alignItems: 'center',
+    gap: 3,
+    padding: compact ? [2, 5] : [3, 7],
+    borderRadius: 6,
+    backgroundColor: THEME.disabledBg,
+    borderWidth: 0.5,
+    borderColor: THEME.disabledBorder,
+    children: [
+      symbol('eye.slash', compact ? 8 : 9, THEME.disabledText),
+      text('当日涨幅字段已关闭', compact ? 9 : 10, 'medium', THEME.disabledText, 1, 0.65),
+    ],
+  };
+}
+
+function resolveDenseMetrics(family, rowCount) {
+  if (family === 'systemMedium') {
+    if (rowCount <= 4) {
+      return {
+        rowPadding: [3, 8],
+        rowRadius: 7,
+        rowGap: 2.5,
+        nameSize: 10.5,
+        metricSize: 9.5,
+        pillPadding: [1.5, 5],
+      };
+    }
+    return {
+      rowPadding: [2, 7],
+      rowRadius: 6,
+      rowGap: 2,
+      nameSize: 9.5,
+      metricSize: 8.5,
+      pillPadding: [1, 4],
+    };
+  }
+  if (rowCount <= 5) {
+    return {
+      rowPadding: [7, 10],
+      rowRadius: 10,
+      rowGap: 5,
+      nameSize: 12,
+      metricSize: 10.5,
+      pillPadding: [2, 6],
+    };
+  }
+  if (rowCount <= 8) {
+    return {
+      rowPadding: [5, 9],
+      rowRadius: 8,
+      rowGap: 4,
+      nameSize: 11,
+      metricSize: 10,
+      pillPadding: [2, 5],
+    };
+  }
+  return {
+    rowPadding: [3, 8],
+    rowRadius: 6,
+    rowGap: 2.5,
+    nameSize: 10,
+    metricSize: 9,
+    pillPadding: [1, 4],
+  };
 }
 
 function holdingRow(row, family, colors, options, liveWindow = true, marketStatus = '开市') {
@@ -602,154 +931,483 @@ function holdingRow(row, family, colors, options, liveWindow = true, marketStatu
   const result = dailyChangeValue(row, narrow || lockScreen, colors, options);
 
   if (family === 'accessoryInline') {
-    return text(`● ${row.name} ${result.fields.length ? result.fields.map((field) => field.text).join(' / ') : result.dailyChange}`, 'caption2', 'medium', statusDotColor(row, liveWindow, marketStatus), 1);
+    return text(`● ${row.name} ${result.fields.length ? result.fields.map((field) => field.text).join(' / ') : result.dailyChange}`, 'caption2', 'medium', statusDotColor(row, liveWindow, marketStatus), 1, 0.7);
   }
   if (family === 'accessoryCircular') {
-    return text(result.fields.length ? result.fields.map((field) => field.text).join('\n') : result.dailyChange, 'caption2', 'semibold', result.dailyChangeColor, 2);
+    return text(
+      result.fields.length ? result.fields.map((field) => field.text).join('\n') : result.dailyChange,
+      9.5,
+      'semibold',
+      result.dailyChangeColor,
+      2,
+      0.5,
+      { textAlign: 'center' },
+    );
   }
-  if (narrow) {
-    const fieldNodes = result.fields.length
-      ? result.fields.map((field) => text(field.text, result.fontSize, 'semibold', result.dailyChangeColor, 1))
-      : [text(result.dailyChange, result.fontSize, 'semibold', result.dailyChangeColor, 1)];
+  if (family === 'accessoryRectangular') {
+    const lineText = result.fields.length
+      ? result.fields.map((field) => field.text).join(' · ')
+      : result.dailyChange;
     return {
       type: 'stack',
       direction: 'column',
       alignItems: 'start',
-      gap: 1,
+      gap: 2,
       children: [
-        fundNameNode(row, 'caption1', 'medium', colors, 1, 0.6, liveWindow, marketStatus),
-        ...fieldNodes,
+        fundNameNode(row, 11, 'semibold', colors, 1, 0.55, liveWindow, marketStatus),
+        text(lineText, 10, 'semibold', result.dailyChangeColor, 1, 0.55),
       ],
     };
   }
 
-  const fieldNodes = result.fields.length
-    ? result.fields.map((field) => text(field.text, result.fontSize, 'semibold', result.dailyChangeColor, 1))
-    : [text(result.dailyChange, result.fontSize, 'semibold', result.dailyChangeColor, 1)];
+  const toneBg = pillBgFor(row.dailyChangeAmount ?? row.dailyChangePct);
+  if (family === 'systemSmall') {
+    const cardChildren = [
+      fundNameNode(row, 11.5, 'semibold', colors, 1, 0.55, liveWindow, marketStatus),
+    ];
+    if (!result.fields.length) {
+      cardChildren.push(disabledFieldPill(true));
+    } else {
+      cardChildren.push(text(result.fields[0].text, 11.5, 'bold', result.dailyChangeColor, 1, 0.6));
+      if (result.fields[1]) {
+        cardChildren.push({
+          type: 'stack',
+          direction: 'row',
+          alignItems: 'center',
+          padding: [2, 6],
+          borderRadius: 6,
+          backgroundColor: toneBg,
+          children: [
+            text(result.fields[1].text, 10, 'semibold', result.dailyChangeColor, 1, 0.6),
+          ],
+        });
+      }
+    }
+    return {
+      type: 'stack',
+      direction: 'column',
+      alignItems: 'start',
+      gap: 4,
+      padding: [7, 9],
+      borderRadius: 11,
+      backgroundColor: THEME.cardBg,
+      borderWidth: 0.5,
+      borderColor: THEME.cardBorder,
+      children: cardChildren,
+    };
+  }
+
+  const rightNode = !result.fields.length
+    ? disabledFieldPill(true)
+    : {
+      type: 'stack',
+      direction: 'column',
+      alignItems: 'end',
+      gap: 2,
+      children: [
+        text(result.fields[0].text, 11, 'bold', result.dailyChangeColor, 1, 0.65, { textAlign: 'right' }),
+        ...(result.fields[1] ? [{
+          type: 'stack',
+          direction: 'row',
+          alignItems: 'center',
+          padding: [1.5, 5],
+          borderRadius: 5,
+          backgroundColor: toneBg,
+          children: [
+            text(result.fields[1].text, 9.5, 'semibold', result.dailyChangeColor, 1, 0.65, { textAlign: 'right' }),
+          ],
+        }] : []),
+      ],
+    };
+
   return {
     type: 'stack',
-    direction: 'column',
-    alignItems: 'start',
-    gap: 1,
+    direction: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: [6, 10],
+    borderRadius: 10,
+    backgroundColor: THEME.cardBg,
+    borderWidth: 0.5,
+    borderColor: THEME.cardBorder,
     children: [
-      fundNameNode(row, 'subheadline', 'medium', colors, 1, 0.6, liveWindow, marketStatus),
-      ...fieldNodes,
+      fundNameNode(row, 12.5, 'semibold', colors, 1, 0.6, liveWindow, marketStatus),
+      rightNode,
     ],
   };
 }
 
-function denseHoldingRow(row, colors, options, liveWindow = true, marketStatus = '开市') {
+function denseHoldingRow(row, colors, options, liveWindow = true, marketStatus = '开市', index = 0, metrics = null) {
+  const m = metrics || resolveDenseMetrics('systemLarge', 6);
   const result = dailyChangeValue(row, true, colors, options);
-  const detail = result.fields.length ? result.fields.map((field) => field.text).join(' · ') : result.dailyChange;
-  const name = fundNameNode(row, 'caption2', 'medium', colors, 1, 0.45, liveWindow, marketStatus);
-  name.flex = 1;
+  const name = fundNameNode(row, m.nameSize, 'medium', colors, 1, 0.5, liveWindow, marketStatus);
+  const rightNode = !result.fields.length
+    ? disabledFieldPill(true)
+    : {
+      type: 'stack',
+      direction: 'row',
+      alignItems: 'center',
+      padding: m.pillPadding,
+      borderRadius: 6,
+      backgroundColor: pillBgFor(row.dailyChangeAmount ?? row.dailyChangePct),
+      children: [
+        text(
+          result.fields.map((field) => field.text).join(' · '),
+          m.metricSize,
+          'semibold',
+          result.dailyChangeColor,
+          1,
+          0.45,
+          { textAlign: 'right' },
+        ),
+      ],
+    };
+  return {
+    type: 'stack',
+    direction: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: m.rowPadding,
+    borderRadius: m.rowRadius,
+    backgroundColor: index % 2 === 0 ? THEME.cardBg : THEME.cardBgAlt,
+    borderWidth: 0.5,
+    borderColor: THEME.cardBorder,
+    children: [
+      name,
+      rightNode,
+    ],
+  };
+}
+
+function stateVariantFor(state, resolvedDataStatus, tokenState) {
+  if (state === '加载中' || resolvedDataStatus === 'loading') {
+    return {
+      icon: 'arrow.triangle.2.circlepath',
+      color: THEME.accent,
+      bg: '#60A5FA1E',
+      border: '#60A5FA40',
+      title: '正在读取持仓…',
+      subtitle: '等待首次行情同步完成',
+    };
+  }
+  if (state === '实时' || resolvedDataStatus === 'empty') {
+    return {
+      icon: 'tray',
+      color: THEME.secondary,
+      bg: '#94A3B81A',
+      border: '#94A3B838',
+      title: '暂无基金持仓',
+      subtitle: '当前基金账户暂无持仓记录',
+    };
+  }
+  if (tokenState && tokenState.status === 'missing') {
+    return {
+      icon: 'key.fill',
+      color: THEME.warning,
+      bg: '#FBBF241E',
+      border: '#FBBF2440',
+      title: '未配置登录令牌',
+      subtitle: '请在模块 Env 中填写 YJB_TOKEN',
+    };
+  }
+  if (tokenState && tokenState.status === 'invalid') {
+    return {
+      icon: 'exclamationmark.shield.fill',
+      color: THEME.positive,
+      bg: '#FF6B6B1E',
+      border: '#FF6B6B40',
+      title: '登录令牌已失效',
+      subtitle: '请重新登录养基宝并更新 YJB_TOKEN',
+    };
+  }
+  return {
+    icon: 'wifi.exclamationmark',
+    color: THEME.positive,
+    bg: '#FF6B6B1E',
+    border: '#FF6B6B40',
+    title: state || '请求失败',
+    subtitle: '请检查网络或配置，稍后自动重试',
+  };
+}
+
+function stateCardNode(state, resolvedDataStatus, tokenState, family) {
+  const variant = stateVariantFor(state, resolvedDataStatus, tokenState);
+  if (family === 'accessoryCircular') {
+    return text(variant.title, 9.5, 'medium', variant.color, 2, 0.55, { textAlign: 'center' });
+  }
+  if (family === 'accessoryRectangular') {
+    return text(variant.title, 10.5, 'medium', variant.color, 2, 0.65);
+  }
+  if (family === 'systemMedium') {
+    return {
+      type: 'stack',
+      direction: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: [10, 14],
+      borderRadius: 12,
+      backgroundColor: THEME.cardBg,
+      borderWidth: 0.5,
+      borderColor: THEME.cardBorder,
+      children: [
+        {
+          type: 'stack',
+          direction: 'row',
+          alignItems: 'center',
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: variant.bg,
+          borderWidth: 0.5,
+          borderColor: variant.border,
+          padding: [9, 9],
+          children: [symbol(variant.icon, 14, variant.color)],
+        },
+        {
+          type: 'stack',
+          direction: 'column',
+          alignItems: 'start',
+          gap: 2,
+          flex: 1,
+          children: [
+            text(variant.title, 13, 'semibold', THEME.primary, 1, 0.7),
+            text(variant.subtitle, 10.5, 'regular', THEME.secondary, 1, 0.7),
+          ],
+        },
+      ],
+    };
+  }
+  const small = family === 'systemSmall';
+  const badgeSize = small ? 24 : 36;
+  const iconSize = small ? 12 : 16;
+  const badgePad = (badgeSize - iconSize) / 2;
+  return {
+    type: 'stack',
+    direction: 'column',
+    alignItems: 'center',
+    gap: small ? 4 : 6,
+    padding: small ? [8, 10] : [16, 18],
+    borderRadius: small ? 11 : 14,
+    backgroundColor: THEME.cardBg,
+    borderWidth: 0.5,
+    borderColor: THEME.cardBorder,
+    children: [
+      {
+        type: 'stack',
+        direction: 'row',
+        alignItems: 'center',
+        width: badgeSize,
+        height: badgeSize,
+        borderRadius: badgeSize / 2,
+        backgroundColor: variant.bg,
+        borderWidth: 0.5,
+        borderColor: variant.border,
+        padding: [badgePad, badgePad],
+        children: [symbol(variant.icon, iconSize, variant.color)],
+      },
+      text(variant.title, small ? 11.5 : 14, 'semibold', THEME.primary, 1, 0.65, { textAlign: 'center' }),
+      text(variant.subtitle, small ? 9.5 : 11, 'regular', THEME.secondary, 2, 0.7, { textAlign: 'center' }),
+    ],
+  };
+}
+
+function cacheNoticeNode(resolvedDataStatus) {
+  const noticeText = resolvedDataStatus === 'quote-error'
+    ? '行情源请求失败，当前展示可用数据或缓存'
+    : '当前显示缓存数据，稍后将自动重试';
+  return {
+    type: 'stack',
+    direction: 'row',
+    alignItems: 'center',
+    gap: 5,
+    padding: [4, 8],
+    borderRadius: 7,
+    backgroundColor: THEME.noticeBg,
+    borderWidth: 0.5,
+    borderColor: THEME.noticeBorder,
+    children: [
+      symbol('exclamationmark.circle.fill', 10, THEME.warning),
+      text(noticeText, 9.5, 'medium', THEME.warning, 1, 0.65),
+    ],
+  };
+}
+
+function footerNode(tokenState, compact) {
+  const style = tokenStyleFor(tokenState);
   return {
     type: 'stack',
     direction: 'row',
     alignItems: 'center',
     gap: 4,
     children: [
-      name,
-      text(detail, 'caption2', 'regular', result.dailyChangeColor, 1, 0.45),
+      symbol(style.icon, compact ? 9 : 10, style.color),
+      text(tokenStatusText(tokenState), compact ? 9 : 10, 'medium', style.color, 1, 0.65),
     ],
   };
 }
 
-function makeWidget(rows, updatedAt, state, marketStatus, refreshSeconds, family, options, dataStatus = null, tokenState = null) {
+function makeWidget(rows, updatedAt, state, marketStatus, refreshSeconds, family, options, dataStatus = null, tokenState = null, widgetUrl = '') {
   const compact = family === 'systemSmall' || family.startsWith('accessory');
   const lockScreen = family.startsWith('accessory');
   const resolvedDataStatus = dataStatus || resolveDataStatus(rows, marketStatus, state === '加载中' ? 'loading' : state === '实时' ? 'success' : 'error');
   const liveWindow = marketStatus === '开市' && (resolvedDataStatus === 'live' || resolvedDataStatus === 'partial');
   const displayRows = rowsByDotColorAndIncome(rows, marketStatus, liveWindow);
   const statusLabel = statusLabelFor(marketStatus, resolvedDataStatus);
-  const statusColor = resolvedDataStatus === 'live'
-    ? '#43C89A'
-    : resolvedDataStatus === 'partial'
-      ? '#FFB84D'
-      : resolvedDataStatus === 'error' || resolvedDataStatus === 'quote-error'
-        ? '#FF6B5F'
-        : '#A9AAB5';
   const denseLayout = !lockScreen && (
     family === 'systemLarge'
     || family === 'systemExtraLarge'
-    || (family === 'systemMedium' && rows.length > 3)
+    || (family === 'systemMedium' && rows.length > 2)
   );
   const colors = {
-    primary: '#FFFFFF',
-    secondary: '#A9AAB5',
-    positive: '#FF6B5F',
-    negative: '#43C89A',
-    neutral: '#E4E5EB',
+    primary: THEME.primary,
+    secondary: THEME.secondary,
+    positive: THEME.positive,
+    negative: THEME.negative,
+    neutral: THEME.neutral,
   };
+  const refreshAfter = new Date(Date.now() + refreshSeconds * 1000).toISOString();
+  const cleanUrl = widgetUrl ? String(widgetUrl).trim() : '';
+
   if (family === 'accessoryInline') {
     const row = displayRows[0];
     const value = row ? holdingRow(row, family, colors, options, liveWindow, marketStatus).text : state;
-    return {
+    const inlineWidget = {
       type: 'widget',
-      refreshAfter: new Date(Date.now() + refreshSeconds * 1000).toISOString(),
-      children: [text(`养基宝 · ${statusLabel} · ${value}`, 'caption2', 'medium', colors.primary, 1)],
+      refreshAfter,
+      children: [text(`养基宝 · ${statusLabel} · ${value}`, 'caption2', 'medium', colors.primary, 1, 0.7)],
     };
+    if (cleanUrl) inlineWidget.url = cleanUrl;
+    return inlineWidget;
   }
 
-  const headerAmount = !compact && !lockScreen
-    ? headerAmountNode(rows, resolvedDataStatus, colors)
-    : null;
-  const headerChildren = [
-    text('养基宝', lockScreen ? 'caption1' : compact ? 'headline' : 'title3', 'bold', colors.primary),
-  ];
-  if (headerAmount) headerChildren.push({ type: 'spacer' }, headerAmount);
-  headerChildren.push({ type: 'spacer' }, text(statusLabel, 'caption2', 'medium', statusColor, 1));
+  if (family === 'accessoryCircular') {
+    const circularChildren = [
+      text(statusLabel, 8.5, 'semibold', statusStyleFor(resolvedDataStatus).color, 1, 0.55, { textAlign: 'center' }),
+    ];
+    if (displayRows.length) {
+      circularChildren.push(text(displayRows[0].name, 8, 'medium', colors.primary, 1, 0.5, { textAlign: 'center' }));
+      circularChildren.push(holdingRow(displayRows[0], family, colors, options, liveWindow, marketStatus));
+    } else {
+      circularChildren.push(stateCardNode(state, resolvedDataStatus, tokenState, family));
+    }
+    const circularWidget = {
+      type: 'widget',
+      refreshAfter,
+      padding: 4,
+      gap: 1,
+      children: [
+        {
+          type: 'stack',
+          direction: 'column',
+          alignItems: 'center',
+          gap: 1,
+          children: circularChildren,
+        },
+      ],
+    };
+    if (cleanUrl) circularWidget.url = cleanUrl;
+    return circularWidget;
+  }
 
   const children = [
-    {
-      type: 'stack',
-      direction: 'row',
-      alignItems: 'center',
-      children: headerChildren,
-    },
+    headerNode(statusLabel, resolvedDataStatus, family),
   ];
 
+  let visibleCount = 0;
+  let denseMetrics = null;
   if (!rows.length) {
     children.push({ type: 'spacer' });
-    const emptyMessage = state === '加载中' ? '正在读取持仓…' : state === '实时' ? '暂无基金持仓' : state;
-    children.push(text(emptyMessage, 'subheadline', 'medium', colors.secondary, 2));
+    children.push(stateCardNode(state, resolvedDataStatus, tokenState, family));
   } else {
-    const visible = denseLayout
-      ? displayRows
-      : displayRows.slice(0, family === 'systemSmall' ? 1 : compact ? 1 : 2);
-    for (const row of visible) {
-      children.push(denseLayout
-        ? denseHoldingRow(row, colors, options, liveWindow, marketStatus)
-        : holdingRow(row, family, colors, options, liveWindow, marketStatus));
+    const summaryCard = summaryCardNode(rows, resolvedDataStatus, family, denseLayout, colors);
+    if (summaryCard) children.push(summaryCard);
+
+    if (denseLayout) {
+      const maxDenseRows = family === 'systemMedium'
+        ? (displayRows.length > 5 ? 4 : displayRows.length)
+        : (displayRows.length > 11 ? 10 : displayRows.length);
+      const visible = displayRows.slice(0, maxDenseRows);
+      visibleCount = visible.length;
+      denseMetrics = resolveDenseMetrics(family, visible.length);
+      visible.forEach((row, index) => {
+        children.push(denseHoldingRow(row, colors, options, liveWindow, marketStatus, index, denseMetrics));
+      });
+      if (displayRows.length > visible.length) {
+        children.push(text(
+          `另有 ${displayRows.length - visible.length} 只`,
+          family === 'systemMedium' ? 8.5 : 9.5,
+          'medium',
+          colors.secondary,
+          1,
+          0.7,
+        ));
+      }
+    } else {
+      const visible = displayRows.slice(0, family === 'systemSmall' ? 1 : lockScreen ? 1 : 2);
+      visibleCount = visible.length;
+      for (const row of visible) {
+        children.push(holdingRow(row, family, colors, options, liveWindow, marketStatus));
+      }
+      if (displayRows.length > visible.length) {
+        children.push(text(
+          `另有 ${displayRows.length - visible.length} 只`,
+          lockScreen ? 8.5 : 9.5,
+          'medium',
+          colors.secondary,
+          1,
+          0.7,
+        ));
+      }
     }
-    if (!denseLayout && displayRows.length > visible.length) {
-      children.push(text(`另有 ${displayRows.length - visible.length} 只`, 'caption2', 'regular', colors.secondary));
+
+    if (
+      (resolvedDataStatus === 'error' || resolvedDataStatus === 'quote-error')
+      && (family === 'systemLarge' || family === 'systemExtraLarge')
+      && displayRows.length <= 8
+    ) {
+      children.push(cacheNoticeNode(resolvedDataStatus));
     }
   }
 
   if (!lockScreen) {
     children.push({ type: 'spacer' });
-    children.push(text(
-      tokenStatusText(tokenState),
-      'caption2',
-      'regular',
-      colors.secondary,
-      1,
-    ));
+    if (!compact) {
+      children.push({
+        type: 'stack',
+        direction: 'row',
+        height: 1,
+        backgroundColor: THEME.divider,
+        children: [{ type: 'spacer' }],
+      });
+    }
+    children.push(footerNode(tokenState, compact));
   }
-  return {
+
+  const padding = lockScreen
+    ? 4
+    : family === 'systemSmall'
+      ? 11
+      : family === 'systemMedium'
+        ? (denseLayout ? [9, 12] : [10, 12])
+        : (denseLayout && visibleCount > 8 ? [11, 13] : 14);
+  const gap = lockScreen
+    ? 2
+    : family === 'systemSmall'
+      ? 5
+      : family === 'systemMedium'
+        ? (denseLayout ? (visibleCount > 4 ? 2 : 2.5) : 5)
+        : (denseMetrics ? denseMetrics.rowGap : 8);
+
+  const root = {
     type: 'widget',
-    refreshAfter: new Date(Date.now() + refreshSeconds * 1000).toISOString(),
-    padding: lockScreen ? 4 : compact ? 10 : 14,
-    gap: lockScreen ? 2 : compact ? 5 : denseLayout ? 3 : 8,
-    backgroundGradient: {
-      type: 'linear',
-      colors: ['#34364B', '#242638'],
-      startPoint: { x: 0, y: 0 },
-      endPoint: { x: 1, y: 1 },
-    },
+    refreshAfter,
+    padding,
+    gap,
     children,
   };
+  if (!lockScreen) root.backgroundGradient = THEME.bgGradient;
+  if (cleanUrl) root.url = cleanUrl;
+  return root;
 }
 
 function md5(input) {
@@ -1205,6 +1863,7 @@ export default async function (ctx) {
   const api = env.YJB_API === 'old' ? 'old' : 'new';
   const family = ctx.widgetFamily || 'systemMedium';
   const options = displayOptions(env);
+  const widgetUrl = pickText(env.YJB_WIDGET_URL).trim();
   const tokenState = createTokenState(env.YJB_TOKEN);
   let rows = [];
   let state = '加载中';
@@ -1230,9 +1889,9 @@ export default async function (ctx) {
         const cachedRows = normalizeCachedRows(cache.rows);
         const cachedStatus = cache.marketStatus || resolveMarketStatus(cachedRows);
         const cachedUpdatedAt = cache.updatedAt || (cache.lastSuccessAt ? localTime(new Date(cache.lastSuccessAt)) : '--');
-        return makeWidget(cachedRows, cachedUpdatedAt, '缓存', cachedStatus, cachedStatus === '开市' ? OPEN_REFRESH_SECONDS : ERROR_REFRESH_SECONDS, family, options, resolveDataStatus(cachedRows, cachedStatus, 'error'), tokenState);
+        return makeWidget(cachedRows, cachedUpdatedAt, '缓存', cachedStatus, cachedStatus === '开市' ? OPEN_REFRESH_SECONDS : ERROR_REFRESH_SECONDS, family, options, resolveDataStatus(cachedRows, cachedStatus, 'error'), tokenState, widgetUrl);
       }
-      return makeWidget([], '--', '加载中', marketStatus, ERROR_REFRESH_SECONDS, family, options, 'loading', tokenState);
+      return makeWidget([], '--', '加载中', marketStatus, ERROR_REFRESH_SECONDS, family, options, 'loading', tokenState, widgetUrl);
     }
     if (!outcome.ok) throw outcome.error;
     const fetched = outcome.value;
@@ -1266,5 +1925,5 @@ export default async function (ctx) {
     refreshSeconds = marketStatus === '开市' ? OPEN_REFRESH_SECONDS : ERROR_REFRESH_SECONDS;
   }
 
-  return makeWidget(rows, updatedAt, state, marketStatus, refreshSeconds, family, options, dataStatus, tokenState);
+  return makeWidget(rows, updatedAt, state, marketStatus, refreshSeconds, family, options, dataStatus, tokenState, widgetUrl);
 }
