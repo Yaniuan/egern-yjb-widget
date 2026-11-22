@@ -14,7 +14,7 @@ widgets:
       YJB_API_BASE: https://app-api.yangjibao.com
       YJB_POLICY: ''
       YJB_TOKEN: <在本机填写养基宝登录令牌>
-      YJB_SIGNING_SECRET: <在本机填写养基宝接口签名密钥>
+      YJB_SIGNING_SECRET: Zk0w9mX7IKFGo5qp5jyDwJKnU7ZJZZJwGhs5myg4vlv4lKEHFKxGe6jlb84KOLkx
       YJB_ACCOUNT_ID: ''
       YJB_SHOW_DAILY_CHANGE_AMOUNT: '1'
       YJB_SHOW_DAILY_CHANGE_PCT: '1'

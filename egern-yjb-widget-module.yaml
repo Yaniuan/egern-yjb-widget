@@ -1,8 +1,9 @@
 name: 养基宝基金持仓
 description: 在 Egern 小组件中显示全部可用基金持仓、当日涨幅金额与涨跌幅、开市状态和 Token 鉴权结果。
-author: YikR
-homepage: https://github.com/YikR/egern-yjb-widget
-manual: https://github.com/YikR/egern-yjb-widget#readme
+author: Yaniuan
+homepage: https://github.com/Yaniuan/egern-yjb-widget
+manual: https://github.com/Yaniuan/egern-yjb-widget#readme
+icon: chart.line.uptrend.xyaxis
 
 env_schema:
   YJB_TOKEN:
@@ -17,12 +18,25 @@ env_schema:
   YJB_SHOW_DAILY_CHANGE_AMOUNT:
     name: 显示当日涨幅金额（0/1）
     description: 设为 1 显示当日涨幅金额，设为 0 隐藏；默认 1。
+    default_value: "1"
+    options:
+      - "1"
+      - "0"
   YJB_SHOW_DAILY_CHANGE_PCT:
     name: 显示当日涨幅（0/1）
     description: 设为 1 显示当日涨幅百分比，设为 0 隐藏；默认 1。
+    default_value: "1"
+    options:
+      - "1"
+      - "0"
   YJB_MAX_FIELDS:
     name: 最多显示字段数（0-2）
     description: 每只基金最多显示的涨幅字段数，不含基金名称；0 表示不显示金额和百分比，默认 2。
+    default_value: "2"
+    options:
+      - "2"
+      - "1"
+      - "0"
   YJB_WIDGET_URL:
     name: 点击跳转链接（可选）
     description: 点击小组件时打开的 URL 或应用 Scheme，留空则不跳转。
@@ -30,7 +44,7 @@ env_schema:
 scriptings:
   - generic:
       name: 养基宝持仓
-      script_url: https://raw.githubusercontent.com/YikR/egern-yjb-widget/main/yjb-fund-widget.js?v=20261122-1
+      script_url: https://raw.githubusercontent.com/Yaniuan/egern-yjb-widget/main/yjb-fund-widget.js?v=20261123-1
       update_interval: 86400
       timeout: 60
 

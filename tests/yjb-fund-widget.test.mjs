@@ -606,6 +606,29 @@ async function testOptionalWidgetUrl() {
   assert.equal(withUrl.url, 'https://yangjibao.com', 'url should attach to root widget when configured');
 }
 
+async function testEnvNormalizationAndSigningSecretFallback() {
+  let receivedAuth = '';
+  const ctx = liveContext('systemMedium');
+  ctx.env = {
+    YJB_TOKEN: '  trimmed-token \n',
+    YJB_SIGNING_SECRET: '   ',
+    YJB_SHOW_DAILY_CHANGE_AMOUNT: 'false',
+    YJB_SHOW_DAILY_CHANGE_PCT: 'true',
+  };
+  const origGet = ctx.http.get;
+  ctx.http.get = async (url, options) => {
+    receivedAuth = options?.headers?.Authorization || '';
+    return origGet(url, options);
+  };
+  const tree = await widget(ctx);
+  assertValidDsl(tree, 'envNormalization');
+  assert.equal(receivedAuth, 'ios:trimmed-token', 'token should be trimmed before auth header construction');
+  const texts = textNodes(tree).map((node) => node.text);
+  assert(texts.some((value) => value.includes('Token 验证成功')), 'empty YJB_SIGNING_SECRET should fall back to built-in secret');
+  assert(texts.some((value) => value.includes('当日涨幅 +1.20%')), 'boolean true toggle should enable pct');
+  assert(!texts.some((value) => value.includes('当日涨幅金额 +12.00')), 'boolean false toggle should hide per-fund amount');
+}
+
 await testFamilies();
 await testClosedStateAndFallbackParsing();
 await testOpenMarketGroupsRowsByDotColor();
@@ -624,4 +647,5 @@ await testEmptyAndErrorVisualStates();
 await testDisabledFieldsState();
 await testDenseListAndLongNames();
 await testOptionalWidgetUrl();
-console.log('PASS: widget families, open-market dot grouping, token and quote-source states, slow-fetch recovery, closed-state semantics, storage isolation, DSL validity, visual states, dense layout, and optional URL');
+await testEnvNormalizationAndSigningSecretFallback();
+console.log('PASS: widget families, open-market dot grouping, token and quote-source states, slow-fetch recovery, closed-state semantics, storage isolation, DSL validity, visual states, dense layout, optional URL, and env normalization');

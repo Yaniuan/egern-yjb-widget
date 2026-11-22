@@ -1,4 +1,5 @@
 const DEFAULT_BASE = 'https://app-api.yangjibao.com';
+const DEFAULT_SIGNING_SECRET = 'Zk0w9mX7IKFGo5qp5jyDwJKnU7ZJZZJwGhs5myg4vlv4lKEHFKxGe6jlb84KOLkx';
 const CACHE_KEY = 'yjb-fund-widget-cache-v2';
 const CACHE_TTL_SECONDS = 60 * 60 * 24;
 const OPEN_REFRESH_SECONDS = 60;
@@ -360,8 +361,9 @@ function colorFor(value, colors) {
 }
 
 function readToggle(env, key, defaultValue = true) {
-  if (String(env[key] ?? '').trim() === '0') return false;
-  if (String(env[key] ?? '').trim() === '1') return true;
+  const raw = String(env[key] ?? '').trim().toLowerCase();
+  if (raw === '0' || raw === 'false') return false;
+  if (raw === '1' || raw === 'true') return true;
   return defaultValue;
 }
 
@@ -1730,16 +1732,16 @@ async function fetchNewQuotes(ctx, { base, token, secret, policy, fundIds, token
 }
 
 async function fetchNew(ctx, env, tokenState) {
-  const token = env.YJB_TOKEN;
-  const secret = env.YJB_SIGNING_SECRET;
-  const base = (env.YJB_API_BASE || DEFAULT_BASE).replace(/\/+$/, '');
-  const policy = env.YJB_POLICY || '';
+  const token = pickText(env.YJB_TOKEN).trim();
+  const secret = pickText(env.YJB_SIGNING_SECRET).trim() || DEFAULT_SIGNING_SECRET;
+  const base = (pickText(env.YJB_API_BASE).trim() || DEFAULT_BASE).replace(/\/+$/, '');
+  const policy = pickText(env.YJB_POLICY).trim();
   if (!token || !secret) {
     if (!token) tokenState.status = 'missing';
     else markTokenFailure(tokenState, '签名密钥未配置');
     throw new Error('请在小组件配置中填写 YJB_TOKEN 和 YJB_SIGNING_SECRET');
   }
-  let accountId = env.YJB_ACCOUNT_ID;
+  let accountId = pickText(env.YJB_ACCOUNT_ID).trim();
   if (!accountId) {
     const accountData = await request(ctx, {
       base, path: '/users/v1/user-account', token, secret, api: 'new', policy, tokenState,
@@ -1790,16 +1792,16 @@ async function fetchNew(ctx, env, tokenState) {
 }
 
 async function fetchOld(ctx, env, tokenState) {
-  const token = env.YJB_TOKEN;
-  const secret = env.YJB_SIGNING_SECRET;
-  const accountId = env.YJB_ACCOUNT_ID;
+  const token = pickText(env.YJB_TOKEN).trim();
+  const secret = pickText(env.YJB_SIGNING_SECRET).trim();
+  const accountId = pickText(env.YJB_ACCOUNT_ID).trim();
   if (!token || !secret || !accountId) {
     if (!token) tokenState.status = 'missing';
     else if (!secret || !accountId) markTokenFailure(tokenState, '旧接口配置不完整');
     throw new Error('旧接口需要配置 YJB_TOKEN、YJB_SIGNING_SECRET 和 YJB_ACCOUNT_ID');
   }
-  const base = (env.YJB_API_BASE || 'http://browser-plug-api.yangjibao.com').replace(/\/+$/, '');
-  const policy = env.YJB_POLICY || '';
+  const base = (pickText(env.YJB_API_BASE).trim() || 'http://browser-plug-api.yangjibao.com').replace(/\/+$/, '');
+  const policy = pickText(env.YJB_POLICY).trim();
   const data = await request(ctx, {
     base,
     path: `/fund_hold?account_id=${encodeURIComponent(accountId)}`,
@@ -1864,7 +1866,7 @@ export default async function (ctx) {
   const family = ctx.widgetFamily || 'systemMedium';
   const options = displayOptions(env);
   const widgetUrl = pickText(env.YJB_WIDGET_URL).trim();
-  const tokenState = createTokenState(env.YJB_TOKEN);
+  const tokenState = createTokenState(pickText(env.YJB_TOKEN).trim());
   let rows = [];
   let state = '加载中';
   let updatedAt = '--';

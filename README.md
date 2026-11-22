@@ -8,18 +8,18 @@
 
 - 名称：`养基宝基金持仓`（可选）
 - 文件位置：远程
-- URL：`https://raw.githubusercontent.com/YikR/egern-yjb-widget/main/egern-yjb-widget-module.yaml?v=20261122-1`
+- URL：`https://raw.githubusercontent.com/Yaniuan/egern-yjb-widget/main/egern-yjb-widget-module.yaml?v=20261123-1`
 - 更新间隔：留空使用 Egern 默认的 86400 秒，或自行设置
 - 启用：打开
 
-保存后编辑该模块，在“环境变量”中填写 `YJB_TOKEN`。新接口所需的固定 `YJB_SIGNING_SECRET` 已放在模块内，不需要手动填写；`YJB_ACCOUNT_ID`、`YJB_POLICY` 和 `YJB_WIDGET_URL` 为可选项。账户 ID 留空时使用第一个基金账户，策略组留空时走 Egern 默认策略，`YJB_WIDGET_URL` 可填写点击小组件时打开的 URL 或应用 Scheme（留空则不跳转）。模块文件声明的环境变量会由 Egern 自动生成输入项。
+保存后编辑该模块，在“环境变量”中填写 `YJB_TOKEN`。新接口所需的固定 `YJB_SIGNING_SECRET` 已放在模块和脚本内，不需要手动填写；`YJB_ACCOUNT_ID`、`YJB_POLICY` 和 `YJB_WIDGET_URL` 为可选项。账户 ID 留空时使用第一个基金账户，策略组留空时走 Egern 默认策略，`YJB_WIDGET_URL` 可填写点击小组件时打开的 URL 或应用 Scheme（留空则不跳转）。模块文件声明的环境变量会由 Egern 自动生成输入项和下拉选择器。
 
-显示字段可通过模块环境变量控制：`YJB_SHOW_DAILY_CHANGE_AMOUNT` 和 `YJB_SHOW_DAILY_CHANGE_PCT` 使用 `0`/`1` 分别关闭或开启当日涨幅金额、当日涨幅百分比；`YJB_MAX_FIELDS` 设置每只基金最多显示的涨幅字段数，范围为 `0`–`2`，不含基金名称，默认 `2`。桌面组件页脚只显示 Token 鉴权结果和时间，不再显示字段上限或市场更新时间；市场状态徽章保留在右上角。桌面中号、大号和超大号组件在有可用金额时会在标题下方展示汇总卡片：全量实时时显示“当日涨幅金额”，部分实时只汇总实时行并显示“实时涨幅金额”，休市或数据延迟时显示“最后有效涨幅金额”。小号和锁屏组件会隐藏汇总金额卡片，避免窄空间中的标题、状态和金额互相挤压。例如只显示涨幅百分比可设置金额为 `0`、百分比为 `1`、字段上限为 `1`。
+显示字段可通过模块环境变量控制：`YJB_SHOW_DAILY_CHANGE_AMOUNT` 和 `YJB_SHOW_DAILY_CHANGE_PCT` 使用 `0`/`1`（或 `false`/`true`）分别关闭或开启当日涨幅金额、当日涨幅百分比；`YJB_MAX_FIELDS` 设置每只基金最多显示的涨幅字段数，范围为 `0`–`2`，不含基金名称，默认 `2`。桌面组件页脚只显示 Token 鉴权结果和时间，不再显示字段上限或市场更新时间；市场状态徽章保留在右上角。桌面中号、大号和超大号组件在有可用金额时会在标题下方展示汇总卡片：全量实时时显示“当日涨幅金额”，部分实时只汇总实时行并显示“实时涨幅金额”，休市或数据延迟时显示“最后有效涨幅金额”。小号和锁屏组件会隐藏汇总金额卡片，避免窄空间中的标题、状态和金额互相挤压。例如只显示涨幅百分比可设置金额为 `0`、百分比为 `1`、字段上限为 `1`。
 
-如果你之前安装过旧版本模块，并在 Env 中保存过 `YJB_SIGNING_SECRET`，请删除这个模块级环境变量后再刷新模块。Egern 的模块级 Env 优先级高于模块内小组件 Env，旧的空值可能覆盖模块内置签名常量。
+即使模块级 Env 中残留了空的 `YJB_SIGNING_SECRET`，脚本也会自动回退到内置签名常量，避免空值覆盖导致鉴权失败。
 
 添加模块后，打开 Egern 的小组件图库，在“模块小组件”中找到“养基宝持仓”并添加到主屏幕或锁屏。模块里的脚本会通过同仓库的 GitHub Raw 地址加载：
-`https://raw.githubusercontent.com/YikR/egern-yjb-widget/main/yjb-fund-widget.js`
+`https://raw.githubusercontent.com/Yaniuan/egern-yjb-widget/main/yjb-fund-widget.js`
 
 如果已经安装过旧模块，请在模块详情中执行一次刷新/重新保存；无法立即刷新时可删除旧模块后用上面的远程模块配置重新添加。模块脚本 URL 带有版本参数，用于避免 Egern 或网络缓存继续使用旧脚本。
 
